@@ -1,5 +1,6 @@
 import { sendLocalNotification } from './local.js'
 import { deliverWebhook } from './webhooks.js'
+import type { DesktopBridge } from './bridge.js'
 import type {
   NotificationEnvelope,
   NotifyLogger,
@@ -11,10 +12,15 @@ export class NotificationHub {
   private readonly inFlight = new Set<Promise<void>>()
 
   constructor(
-    private readonly config: ResolvedPluginConfig,
+    private config: ResolvedPluginConfig,
     private readonly logger: NotifyLogger,
+    private readonly desktopBridge: DesktopBridge | null = null,
     private readonly maxInFlight = 100,
   ) {}
+
+  updateConfig(config: ResolvedPluginConfig): void {
+    this.config = config
+  }
 
   dispatch(envelope: NotificationEnvelope): void {
     if (this.inFlight.size >= this.maxInFlight) {
@@ -24,7 +30,7 @@ export class NotificationHub {
     if (this.config.local.enabled) {
       this.launch(
         `local ${envelope.id}`,
-        sendLocalNotification(envelope, this.config, this.lifetime.signal),
+        this.deliverLocal(envelope),
       )
     }
     for (const channel of this.config.webhooks) {
@@ -45,6 +51,21 @@ export class NotificationHub {
 
   dispose(): void {
     this.lifetime.abort(new Error('dsh-notify-center disposed'))
+  }
+
+  private async deliverLocal(envelope: NotificationEnvelope): Promise<void> {
+    if (this.desktopBridge) {
+      try {
+        await this.desktopBridge.deliver(envelope, this.config, this.lifetime.signal)
+        return
+      } catch (error) {
+        if (this.lifetime.signal.aborted) throw error
+        this.logger.warn(
+          `[dsh-notify-center] desktop bridge unavailable; using native fallback: ${error instanceof Error ? error.message : 'unknown error'}`,
+        )
+      }
+    }
+    await sendLocalNotification(envelope, this.config, this.lifetime.signal)
   }
 
   private launch(label: string, operation: Promise<unknown>, logSuccess = true): void {

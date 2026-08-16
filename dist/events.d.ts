@@ -4,9 +4,10 @@ export declare function textOf(content: readonly unknown[]): string;
 export declare function appendBounded(current: string, value: string, maxChars: number): string;
 export declare function sessionTitle(session: Pick<Session, 'id' | 'events'>): string;
 export declare class TurnAccumulator {
-    private readonly maxBodyChars;
+    private maxBodyChars;
     private readonly active;
     constructor(maxBodyChars: number);
+    setMaxBodyChars(maxBodyChars: number): void;
     observe(session: Session, event: SessionEvent): NotificationEnvelope | null;
     forget(sessionId: string): void;
 }

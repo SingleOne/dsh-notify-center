@@ -100,7 +100,11 @@ function foldTurn(
 export class TurnAccumulator {
   private readonly active = new Map<string, ActiveTurn>()
 
-  constructor(private readonly maxBodyChars: number) {}
+  constructor(private maxBodyChars: number) {}
+
+  setMaxBodyChars(maxBodyChars: number): void {
+    this.maxBodyChars = maxBodyChars
+  }
 
   observe(session: Session, event: SessionEvent): NotificationEnvelope | null {
     const sessionId = stringId(session.id)

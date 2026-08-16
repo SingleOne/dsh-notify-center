@@ -13,10 +13,12 @@ DeepSeek Harness 的统一通知插件。顶层 Agent 完成一轮任务或等�
 - 每个 Webhook 可独立选择事件和摘要权限；默认不向远程通道发送回复摘要。
 - Webhook 超时和指数退避重试；投递不阻塞 Agent，日志不会输出 Webhook URL。
 - 每条本机通知使用 `session + turn/event` 唯一标识，避免 Windows 因复用 tag 静默吞掉后续通知。
+- DSH Web UI 内置可视化设置页，Webhook URL 以 secret 字段持久化且不会回传浏览器。
+- 可选的认证回环桥接优先交给桌面 App 展示通知；桥接缺失或失败时自动回退系统原生通知。
 
 ## 当前阶段
 
-第一阶段是纯 Host bundle：配置来自 DSH profile，安装后不依赖浏览器页面或 Notification 权限。设置页面、前台会话免打扰以及点击通知跳转桌面会话属于后续阶段。
+第二阶段包含 Host 通知服务和随包发布的浏览器设置页。插件仍可独立运行：没有桌面 App 时直接使用 Windows、macOS 或 Linux 的系统通知；桌面 App 只提供更可靠的 Electron 通知和点击会话定位。
 
 ## 本地开发安装
 
@@ -41,11 +43,11 @@ dsh plugin --profile web add github:SingleOne/dsh-notify-center
 
 仓库提交预构建的 `dist`，GitHub 安装不需要放开 pnpm 的依赖构建权限；npm 发布时由 `prepack` 重新构建。
 
-安装或修改配置后重启 `dsh web`。
+安装后重启 `dsh web`。在 DSH 左侧设置入口中选择“通知中心”即可修改设置，保存后实时生效。
 
 ## 配置
 
-在 `~/.dsh/profiles/web/cordis.patch.yml` 中为插件行添加 `config`：
+推荐通过 DSH Web UI 的“通知中心”页面配置。也可以在 `~/.dsh/profiles/web/cordis.patch.yml` 中为插件行添加 `config` 作为组合基础值；可视化页面保存的用户层设置会覆盖基础值：
 
 ```yaml
 - id: dsh-notify-center
@@ -100,6 +102,19 @@ webhooks:
   slack: 'https://hooks.slack.com/services/REPLACE_ME'
 ```
 
+旧版 URL 简写在载入配置基础层时会自动归一化为对象形式，后续从设置页修改事件范围不会丢失基础层 URL。
+
+页面保存的用户层位于 `$DSH_HOME/dsh-notify-center/settings.json`；未设置 `DSH_HOME` 时使用 `~/.dsh/dsh-notify-center/settings.json`。插件使用 revision 防止多个页面互相覆盖，并通过同目录临时文件原子替换。该文件由插件维护，不建议手工编辑。
+
+### 桌面桥接
+
+桌面 App 启动 DSH 子进程时可注入以下临时环境变量：
+
+- `DSH_NOTIFY_BRIDGE_URL`：仅接受 `http://127.0.0.1:<随机端口>/...`。
+- `DSH_NOTIFY_BRIDGE_TOKEN`：每次 App 启动生成的高强度临时令牌。
+
+插件以 Bearer Token 向桥接发送已经本地化的通知标题、正文和会话定位信息。URL 与令牌不会写入插件日志；任一变量缺失、端点不是回环地址、认证失败或请求超时都会禁用桥接或回退到系统原生通知。Webhook 通知始终由插件直接投递，不经过桌面 App。
+
 ### 规则语义
 
 - 任意排除规则命中时不通知。
@@ -125,7 +140,7 @@ webhooks:
 
 ## 隐私与权限
 
-- Webhook URL 只存在 Host 配置中，不写入会话日志，也不会进入模型上下文。
+- Webhook URL 只存在当前用户的 Host 设置文件或 profile 基础配置中；插件配置 API 仅接受回环同源请求，并从所有响应中剥离 URL，不写入会话日志，也不会进入模型上下文。
 - 远程通道默认 `includeSummary: false`；启用后会发送该轮回复的有界摘要。
 - 插件仅向显式配置的 HTTP(S) 地址发请求。
 - Windows 首次通知会创建开始菜单快捷方式 `dsh-notify-center.lnk` 并在当前用户的 `HKCU\\Software\\Classes\\AppUserModelId` 下注册 `DeepSeekHarness.NotifyCenter`。这是未打包 Win32 进程可靠显示 Toast 所需的 AUMID 注册，不写入系统级注册表；移除快捷方式和该 HKCU 项即可撤销。
@@ -139,13 +154,13 @@ npm test
 npm run build
 ```
 
-测试覆盖配置与安全默认值、完成/审批事件折叠、去重、规则、各平台命令构造、Webhook 载荷脱敏、失败重试和普通 4xx 不重试。
+测试覆盖配置与安全默认值、设置原子持久化、revision 冲突与 HTTP 同源限制、桌面桥接认证和脱敏、完成/审批事件折叠、去重、规则、各平台命令构造、Webhook 载荷脱敏、失败重试和普通 4xx 不重试。
 
 ## 已知限制
 
-- Windows Toast 点击尚不能激活当前 Electron 会话；需要桌面 App 后续提供自定义协议。
+- 独立系统通知的点击行为由操作系统负责，只有桌面桥接通知支持唤醒 App 并定位会话。
 - Linux 系统必须提供 `notify-send`。
-- 第一阶段无浏览器设置页面，Webhook 密钥需在 Host profile 中配置。
+- 可视化设置页仅随 DSH Web UI 加载；headless 使用方式仍通过 profile 配置。缺少 WebServer 时只会停用页面和配置 API，不影响本机通知与 Webhook 投递。
 - 投递队列仅保存在内存中；DSH 进程退出时不会持久化未完成重试。
 
 ## License

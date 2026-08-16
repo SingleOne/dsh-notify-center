@@ -12,12 +12,31 @@ import {
   type WebhookInput,
 } from './types.js'
 
-// Schemastery's structural inference treats a string/object union as the
-// intersection with String's prototype. Runtime shape validation stays in
-// resolveWebhook(), which also produces clearer channel-specific errors.
-const webhookChannelSchema = Schema.any<WebhookInput>()
+function createWebhookObjectSchema(requireUrl = true) {
+  const url = Schema.string().role('secret')
+  return Schema.object({
+    url: requireUrl ? url.required() : url,
+    // Runtime validation below retains a channel-specific error for unknown
+    // values while the settings page presents the supported choices.
+    events: Schema.array(Schema.string()),
+    includeSummary: Schema.boolean(),
+  })
+}
 
-export const Config = Schema.object({
+// Keep the legacy string form for existing profile configurations. New writes
+// from the settings page always use the object form so URL secrets can be
+// redacted without hiding the channel's event policy.
+const webhookChannelSchema = Schema.union([
+  Schema.string().role('secret'),
+  createWebhookObjectSchema(),
+]) as unknown as Schema<WebhookInput>
+
+// Schemastery schemas are contravariant in their input type, so the factory
+// accepts any concrete object schema and the exported surfaces restore the
+// public PluginConfig type below.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function createConfigSchema(webhooks: Schema<any>) {
+  return Schema.object({
   locale: Schema.union([Schema.const('zh'), Schema.const('en')]).default('zh'),
   notifySubagents: Schema.boolean().default(false),
   events: Schema.object({
@@ -39,23 +58,29 @@ export const Config = Schema.object({
     regex: Schema.boolean(),
     caseSensitive: Schema.boolean(),
   })),
-  webhooks: Schema.object({
-    feishu: webhookChannelSchema,
-    wecom: webhookChannelSchema,
-    dingtalk: webhookChannelSchema,
-    slack: webhookChannelSchema,
-    discord: webhookChannelSchema,
-    custom: webhookChannelSchema,
-  }),
+  webhooks,
   delivery: Schema.object({
     timeoutMs: Schema.natural().min(100).max(60_000),
     retries: Schema.natural().max(5),
     retryBaseMs: Schema.natural().min(50).max(30_000),
     maxBodyChars: Schema.natural().min(40).max(4_000),
   }),
-})
+  })
+}
 
-const DEFAULT_EVENTS: Record<NotificationKind, boolean> = {
+export const Config = createConfigSchema(Schema.object({
+  feishu: webhookChannelSchema,
+  wecom: webhookChannelSchema,
+  dingtalk: webhookChannelSchema,
+  slack: webhookChannelSchema,
+  discord: webhookChannelSchema,
+  custom: webhookChannelSchema,
+})) as unknown as Schema<PluginConfig>
+
+// Settings use a non-union object shape. Schemastery secret redaction cannot
+// safely choose a branch inside a string/object union, while the composition
+// base has already normalized all legacy strings before registration.
+export const DEFAULT_EVENTS: Record<NotificationKind, boolean> = {
   completed: true,
   error: true,
   aborted: false,
@@ -63,6 +88,26 @@ const DEFAULT_EVENTS: Record<NotificationKind, boolean> = {
   'max-tokens': true,
   interrupted: true,
   approval: true,
+}
+
+function stripGeneratedEmptyWebhookChannels(input: PluginConfig): PluginConfig {
+  if (!input.webhooks) return input
+  let changed = false
+  const webhooks: Partial<Record<WebhookChannelName, WebhookInput>> = {}
+  for (const name of WEBHOOK_CHANNELS) {
+    const value = input.webhooks[name]
+    if (
+      value && typeof value === 'object' && !Array.isArray(value)
+      && (typeof value.url !== 'string' || !value.url.trim())
+      && (value.events === undefined || value.events.length === 0)
+      && value.includeSummary !== true
+    ) {
+      changed = true
+      continue
+    }
+    if (value !== undefined) webhooks[name] = value
+  }
+  return changed ? { ...input, webhooks } : input
 }
 
 function resolveRule(rule: NonNullable<PluginConfig['rules']>[number], index: number): ResolvedNotificationRule {
@@ -129,10 +174,13 @@ function resolveWebhook(name: WebhookChannelName, input: WebhookInput): Resolved
 }
 
 export function resolveConfig(input: PluginConfig = {}): ResolvedPluginConfig {
-  const parsed = Config(input as never) as unknown as PluginConfig
+  const parsed = Config(stripGeneratedEmptyWebhookChannels(input) as never) as unknown as PluginConfig
   const webhooks: ResolvedWebhookChannel[] = []
   for (const name of WEBHOOK_CHANNELS) {
     const value = parsed.webhooks?.[name]
+    if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) {
+      continue
+    }
     if (value !== undefined && value !== null) webhooks.push(resolveWebhook(name, value))
   }
 
@@ -161,4 +209,20 @@ export function resolveConfig(input: PluginConfig = {}): ResolvedPluginConfig {
       maxBodyChars: parsed.delivery?.maxBodyChars ?? 400,
     },
   }
+}
+
+/**
+ * Normalize legacy string webhook entries before applying the persisted user
+ * layer. This keeps every secret URL at webhooks.<channel>.url so non-secret
+ * path operations never need to read or replace it.
+ */
+export function normalizeSettingsBase(input: PluginConfig): PluginConfig {
+  if (!input.webhooks) return input
+  const webhooks: Partial<Record<WebhookChannelName, WebhookInput>> = {}
+  for (const name of WEBHOOK_CHANNELS) {
+    const value = input.webhooks[name]
+    if (typeof value === 'string') webhooks[name] = { url: value }
+    else if (value !== undefined) webhooks[name] = value
+  }
+  return { ...input, webhooks }
 }

@@ -3,13 +3,18 @@ import { deliverWebhook } from './webhooks.js';
 export class NotificationHub {
     config;
     logger;
+    desktopBridge;
     maxInFlight;
     lifetime = new AbortController();
     inFlight = new Set();
-    constructor(config, logger, maxInFlight = 100) {
+    constructor(config, logger, desktopBridge = null, maxInFlight = 100) {
         this.config = config;
         this.logger = logger;
+        this.desktopBridge = desktopBridge;
         this.maxInFlight = maxInFlight;
+    }
+    updateConfig(config) {
+        this.config = config;
     }
     dispatch(envelope) {
         if (this.inFlight.size >= this.maxInFlight) {
@@ -17,7 +22,7 @@ export class NotificationHub {
             return;
         }
         if (this.config.local.enabled) {
-            this.launch(`local ${envelope.id}`, sendLocalNotification(envelope, this.config, this.lifetime.signal));
+            this.launch(`local ${envelope.id}`, this.deliverLocal(envelope));
         }
         for (const channel of this.config.webhooks) {
             if (!channel.events.has(envelope.kind))
@@ -33,6 +38,20 @@ export class NotificationHub {
     }
     dispose() {
         this.lifetime.abort(new Error('dsh-notify-center disposed'));
+    }
+    async deliverLocal(envelope) {
+        if (this.desktopBridge) {
+            try {
+                await this.desktopBridge.deliver(envelope, this.config, this.lifetime.signal);
+                return;
+            }
+            catch (error) {
+                if (this.lifetime.signal.aborted)
+                    throw error;
+                this.logger.warn(`[dsh-notify-center] desktop bridge unavailable; using native fallback: ${error instanceof Error ? error.message : 'unknown error'}`);
+            }
+        }
+        await sendLocalNotification(envelope, this.config, this.lifetime.signal);
     }
     launch(label, operation, logSuccess = true) {
         const task = operation

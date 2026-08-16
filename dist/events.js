@@ -89,6 +89,9 @@ export class TurnAccumulator {
     constructor(maxBodyChars) {
         this.maxBodyChars = maxBodyChars;
     }
+    setMaxBodyChars(maxBodyChars) {
+        this.maxBodyChars = maxBodyChars;
+    }
     observe(session, event) {
         const sessionId = stringId(session.id);
         switch (event.type) {
