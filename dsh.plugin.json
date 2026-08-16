@@ -1,7 +1,7 @@
 {
   "name": "dsh-notify-center",
   "description": "Native desktop and webhook notifications for DeepSeek Harness",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "entry": {
     "name": "dsh-notify-center",
     "inject": ["sessions", "agents"]

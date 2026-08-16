@@ -829,6 +829,44 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
+		//#region src/client/activation.ts
+		const DESKTOP_SESSION_ACTIVATION_EVENT = "dsh-notify-center:activate-session";
+		function isRecord(value) {
+			return typeof value === "object" && value !== null && !Array.isArray(value);
+		}
+		function parseSessionActivationDetail(value) {
+			if (!isRecord(value)) return null;
+			if (Object.keys(value).some((key) => key !== "version" && key !== "sessionId" && key !== "turn")) return null;
+			if (value.version !== 1) return null;
+			if (typeof value.sessionId !== "string" || value.sessionId.length === 0 || value.sessionId.length > 512 || value.sessionId.trim() !== value.sessionId) return null;
+			if (value.turn !== void 0 && (!Number.isSafeInteger(value.turn) || value.turn < 0)) return null;
+			return {
+				version: 1,
+				sessionId: value.sessionId,
+				...value.turn === void 0 ? {} : { turn: value.turn }
+			};
+		}
+		function registerDesktopSessionActivation(target, sessions, logger = console) {
+			const listener = (event) => {
+				const detail = parseSessionActivationDetail(event.detail);
+				if (!detail) {
+					logger.warn("[dsh-notify-center] ignored invalid desktop session activation");
+					return;
+				}
+				try {
+					if (!Object.prototype.hasOwnProperty.call(sessions.list.getSnapshot().byId, detail.sessionId) && !sessions.subagentAddress(detail.sessionId)) {
+						logger.warn("[dsh-notify-center] ignored desktop activation for an unknown session");
+						return;
+					}
+					sessions.open(detail.sessionId);
+				} catch {
+					logger.warn("[dsh-notify-center] desktop session activation failed");
+				}
+			};
+			target.addEventListener(DESKTOP_SESSION_ACTIVATION_EVENT, listener);
+			return () => target.removeEventListener(DESKTOP_SESSION_ACTIVATION_EVENT, listener);
+		}
+		//#endregion
 		//#region src/client/styles.ts
 		const styles = String.raw`
 .dnc-page{display:flex;flex-direction:column;gap:16px;width:100%;max-width:920px;padding:0 0 28px;color:var(--dsw-alias-label-primary);font-family:var(--ds-font-family-sans,system-ui,sans-serif)}
@@ -843,7 +881,7 @@ window.__ModuleLoader__.load({
 `;
 		//#endregion
 		//#region src/client/index.tsx
-		const inject = ["slots"];
+		const inject = ["slots", "sessions"];
 		function apply(ctx) {
 			const style = document.createElement("style");
 			style.dataset.plugin = "dsh-notify-center";
@@ -851,6 +889,7 @@ window.__ModuleLoader__.load({
 			style.textContent = styles;
 			document.head.appendChild(style);
 			ctx.effect(() => () => style.remove(), "dsh-notify-center: settings styles");
+			ctx.effect(() => registerDesktopSessionActivation(window, ctx.sessions), "dsh-notify-center: desktop session activation");
 			const controller = new NotificationSettingsController();
 			const injected = () => ({ controller });
 			ctx.slots.inject("settings.section", () => ctx.slots.register({

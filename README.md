@@ -115,6 +115,8 @@ webhooks:
 
 插件以 Bearer Token 向桥接发送已经本地化的通知标题、正文和会话定位信息。URL 与令牌不会写入插件日志；任一变量缺失、端点不是回环地址、认证失败或请求超时都会禁用桥接或回退到系统原生通知。Webhook 通知始终由插件直接投递，不经过桌面 App。
 
+用户点击桌面 App 展示的通知后，App 会在 DSH Web 页面派发版本化的 `dsh-notify-center:activate-session` 事件。插件客户端严格校验 `{ version: 1, sessionId, turn? }`，确认目标是已列出或已寻址的会话后，通过 DSH Client Runtime 的 `sessions.open()` 完成定位。桌面 App 不读取或操作 DSH 会话列表 DOM。
+
 ### 规则语义
 
 - 任意排除规则命中时不通知。
