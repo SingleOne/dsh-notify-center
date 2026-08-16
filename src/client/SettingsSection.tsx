@@ -137,9 +137,9 @@ export function SettingsSection({ controller }: SettingsSectionProps): ReactNode
           <h3>常规</h3>
           <p>选择语言、通知范围和本机系统通知行为。</p>
         </div>
-        <div className="dnc-grid dnc-grid--two">
-          <label className="dnc-field">
-            <span>通知语言</span>
+        <div className="dnc-general-grid">
+          <label className="dnc-general-language">
+            <span><strong>通知语言</strong><small>设置通知内容使用的语言</small></span>
             <select
               value={draft.locale}
               disabled={disabled}
@@ -152,44 +152,42 @@ export function SettingsSection({ controller }: SettingsSectionProps): ReactNode
               <option value="en">English</option>
             </select>
           </label>
-          <div className="dnc-switch-list">
-            <label className="dnc-switch">
-              <input
-                type="checkbox"
-                checked={draft.local.enabled}
-                disabled={disabled}
-                onChange={(event) => {
-                  const enabled = event.currentTarget.checked
-                  setDraft(current => ({ ...current, local: { ...current.local, enabled } }))
-                }}
-              />
-              <span><strong>本机系统通知</strong><small>桌面 App 不可用时自动使用系统原生实现</small></span>
-            </label>
-            <label className="dnc-switch">
-              <input
-                type="checkbox"
-                checked={draft.local.sound}
-                disabled={disabled || !draft.local.enabled}
-                onChange={(event) => {
-                  const sound = event.currentTarget.checked
-                  setDraft(current => ({ ...current, local: { ...current.local, sound } }))
-                }}
-              />
-              <span><strong>通知声音</strong><small>是否请求系统播放提示音</small></span>
-            </label>
-            <label className="dnc-switch">
-              <input
-                type="checkbox"
-                checked={draft.notifySubagents}
-                disabled={disabled}
-                onChange={(event) => {
-                  const notifySubagents = event.currentTarget.checked
-                  setDraft(current => ({ ...current, notifySubagents }))
-                }}
-              />
-              <span><strong>包含子代理</strong><small>默认仅通知根任务，开启后包含子代理任务</small></span>
-            </label>
-          </div>
+          <label className="dnc-switch">
+            <input
+              type="checkbox"
+              checked={draft.local.enabled}
+              disabled={disabled}
+              onChange={(event) => {
+                const enabled = event.currentTarget.checked
+                setDraft(current => ({ ...current, local: { ...current.local, enabled } }))
+              }}
+            />
+            <span><strong>本机系统通知</strong><small>桌面 App 不可用时自动使用系统原生实现</small></span>
+          </label>
+          <label className="dnc-switch">
+            <input
+              type="checkbox"
+              checked={draft.local.sound}
+              disabled={disabled || !draft.local.enabled}
+              onChange={(event) => {
+                const sound = event.currentTarget.checked
+                setDraft(current => ({ ...current, local: { ...current.local, sound } }))
+              }}
+            />
+            <span><strong>通知声音</strong><small>是否请求系统播放提示音</small></span>
+          </label>
+          <label className="dnc-switch">
+            <input
+              type="checkbox"
+              checked={draft.notifySubagents}
+              disabled={disabled}
+              onChange={(event) => {
+                const notifySubagents = event.currentTarget.checked
+                setDraft(current => ({ ...current, notifySubagents }))
+              }}
+            />
+            <span><strong>包含子代理</strong><small>默认仅通知根任务，开启后包含子代理任务</small></span>
+          </label>
         </div>
       </section>
 
