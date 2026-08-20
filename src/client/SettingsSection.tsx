@@ -45,6 +45,8 @@ const CHANNEL_LABELS: Record<WebhookChannelName, string> = {
   custom: '自定义 Webhook',
 }
 
+const BANNER_TIMEOUT_MS = 5_000
+
 function eventConfig(value: NotificationSettingsValue): Record<string, boolean> {
   return {
     completed: value.events.completed,
@@ -71,12 +73,26 @@ export function SettingsSection({ controller }: SettingsSectionProps): ReactNode
   const [draft, setDraft] = useState(resolved)
   const [webhookUrls, setWebhookUrls] = useState<Partial<Record<WebhookChannelName, string>>>({})
   const [saved, setSaved] = useState(false)
+  const [errorDismissed, setErrorDismissed] = useState(false)
 
   useEffect(() => { void controller.load() }, [controller])
   useEffect(() => {
     setDraft(resolved)
     setWebhookUrls({})
   }, [resolved])
+  useEffect(() => {
+    if (state.status === 'error') setErrorDismissed(false)
+  }, [state.status, state.error])
+  useEffect(() => {
+    if (!saved) return
+    const timeout = window.setTimeout(() => setSaved(false), BANNER_TIMEOUT_MS)
+    return () => window.clearTimeout(timeout)
+  }, [saved])
+  useEffect(() => {
+    if (!state.error || errorDismissed) return
+    const timeout = window.setTimeout(() => setErrorDismissed(true), BANNER_TIMEOUT_MS)
+    return () => window.clearTimeout(timeout)
+  }, [state.error, errorDismissed])
 
   if (state.status === 'idle' || (state.status === 'loading' && state.view === null)) {
     return <p className="dnc-status">正在读取通知设置…</p>
@@ -129,8 +145,28 @@ export function SettingsSection({ controller }: SettingsSectionProps): ReactNode
       </header>
 
       {!state.writable ? <p className="dnc-banner">当前插件设置存储为只读，所有控件已禁用。</p> : null}
-      {state.error ? <p className="dnc-banner dnc-banner--error" role="alert">保存失败：{state.error}</p> : null}
-      {saved ? <p className="dnc-banner dnc-banner--success">设置已保存并实时应用。</p> : null}
+      {state.error && !errorDismissed ? (
+        <div className="dnc-banner dnc-banner--error" role="alert">
+          <span>保存失败：{state.error}</span>
+          <button
+            className="dnc-banner-close"
+            type="button"
+            aria-label="关闭保存失败提示"
+            onClick={() => setErrorDismissed(true)}
+          >×</button>
+        </div>
+      ) : null}
+      {saved ? (
+        <div className="dnc-banner dnc-banner--success" role="status">
+          <span>设置已保存并实时应用。</span>
+          <button
+            className="dnc-banner-close"
+            type="button"
+            aria-label="关闭保存成功提示"
+            onClick={() => setSaved(false)}
+          >×</button>
+        </div>
+      ) : null}
 
       <section className="dnc-panel">
         <div className="dnc-panel-title">

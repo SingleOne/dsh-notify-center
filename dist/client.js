@@ -251,6 +251,7 @@ window.__ModuleLoader__.load({
 			discord: "Discord",
 			custom: "自定义 Webhook"
 		};
+		const BANNER_TIMEOUT_MS = 5e3;
 		function eventConfig(value) {
 			return {
 				completed: value.events.completed,
@@ -272,6 +273,7 @@ window.__ModuleLoader__.load({
 			const [draft, setDraft] = (0, react.useState)(resolved);
 			const [webhookUrls, setWebhookUrls] = (0, react.useState)({});
 			const [saved, setSaved] = (0, react.useState)(false);
+			const [errorDismissed, setErrorDismissed] = (0, react.useState)(false);
 			(0, react.useEffect)(() => {
 				controller.load();
 			}, [controller]);
@@ -279,6 +281,19 @@ window.__ModuleLoader__.load({
 				setDraft(resolved);
 				setWebhookUrls({});
 			}, [resolved]);
+			(0, react.useEffect)(() => {
+				if (state.status === "error") setErrorDismissed(false);
+			}, [state.status, state.error]);
+			(0, react.useEffect)(() => {
+				if (!saved) return;
+				const timeout = window.setTimeout(() => setSaved(false), BANNER_TIMEOUT_MS);
+				return () => window.clearTimeout(timeout);
+			}, [saved]);
+			(0, react.useEffect)(() => {
+				if (!state.error || errorDismissed) return;
+				const timeout = window.setTimeout(() => setErrorDismissed(true), BANNER_TIMEOUT_MS);
+				return () => window.clearTimeout(timeout);
+			}, [state.error, errorDismissed]);
 			if (state.status === "idle" || state.status === "loading" && state.view === null) return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
 				className: "dnc-status",
 				children: "正在读取通知设置…"
@@ -384,14 +399,27 @@ window.__ModuleLoader__.load({
 						className: "dnc-banner",
 						children: "当前插件设置存储为只读，所有控件已禁用。"
 					}) : null,
-					state.error ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+					state.error && !errorDismissed ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						className: "dnc-banner dnc-banner--error",
 						role: "alert",
-						children: ["保存失败：", state.error]
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", { children: ["保存失败：", state.error] }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							className: "dnc-banner-close",
+							type: "button",
+							"aria-label": "关闭保存失败提示",
+							onClick: () => setErrorDismissed(true),
+							children: "×"
+						})]
 					}) : null,
-					saved ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("p", {
+					saved ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 						className: "dnc-banner dnc-banner--success",
-						children: "设置已保存并实时应用。"
+						role: "status",
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: "设置已保存并实时应用。" }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+							className: "dnc-banner-close",
+							type: "button",
+							"aria-label": "关闭保存成功提示",
+							onClick: () => setSaved(false),
+							children: "×"
+						})]
 					}) : null,
 					/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("section", {
 						className: "dnc-panel",
@@ -874,7 +902,7 @@ window.__ModuleLoader__.load({
 .dnc-general-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.dnc-general-language,.dnc-switch{box-sizing:border-box;min-height:72px;border:1px solid var(--dsw-alias-border-l2);border-radius:9px;padding:10px 12px;background:var(--dsw-alias-bg-layer-1)}.dnc-general-language{display:grid;grid-template-columns:minmax(0,1fr) minmax(120px,140px);align-items:center;gap:12px}.dnc-general-language>span,.dnc-switch span{display:flex;flex-direction:column;gap:2px}.dnc-general-language strong,.dnc-switch strong{font-size:13px;line-height:18px}.dnc-general-language small,.dnc-switch small{color:var(--dsw-alias-label-tertiary);font-size:11px;line-height:17px}.dnc-general-language select{box-sizing:border-box;width:100%;min-height:36px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:7px 10px;outline:none;background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px}.dnc-general-language select:focus{border-color:var(--dsw-alias-state-business-primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-state-business-primary) 18%,transparent)}.dnc-switch{display:flex;align-items:flex-start;gap:10px}.dnc-switch input,.dnc-check input{margin:3px 0 0;accent-color:var(--dsw-alias-state-business-primary)}
 .dnc-check-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.dnc-check{display:flex;align-items:flex-start;gap:8px;color:var(--dsw-alias-label-secondary);font-size:12px;line-height:18px}.dnc-check--inline{margin-top:12px}.dnc-rules{display:flex;flex-direction:column;gap:8px}.dnc-rule{display:grid;grid-template-columns:90px minmax(140px,1fr) auto auto auto;align-items:center;gap:8px}.dnc-rule label{display:flex;align-items:center;gap:5px;white-space:nowrap;color:var(--dsw-alias-label-secondary);font-size:11px}.dnc-rule label input{width:auto;min-height:auto}.dnc-empty,.dnc-status{margin:0;color:var(--dsw-alias-label-tertiary);font-size:13px;line-height:20px}.dnc-status--error{color:var(--dsw-alias-state-error-primary)}
 .dnc-webhooks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.dnc-webhook{border:1px solid var(--dsw-alias-border-l2);border-radius:10px;padding:14px;background:var(--dsw-alias-bg-layer-1)}.dnc-webhook[data-configured=true]{border-color:color-mix(in srgb,var(--dsw-alias-state-success-primary) 35%,var(--dsw-alias-border-l2))}.dnc-webhook-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}.dnc-webhook-head>div{display:flex;align-items:center;gap:8px}.dnc-webhook h4{font-size:13px;line-height:20px}.dnc-webhook-head span{border-radius:5px;padding:1px 6px;background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-tertiary);font-size:10px}.dnc-webhook[data-configured=true] .dnc-webhook-head span{background:color-mix(in srgb,var(--dsw-alias-state-success-primary) 10%,transparent);color:var(--dsw-alias-state-success-primary)}.dnc-webhook details{margin-top:11px;border-top:1px solid var(--dsw-alias-border-l2);padding-top:9px}.dnc-webhook summary{cursor:pointer;color:var(--dsw-alias-label-secondary);font-size:11px}.dnc-webhook-events{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:10px}
-.dnc-button,.dnc-icon-button{border:0;border-radius:8px;padding:8px 13px;font:inherit;font-size:12px;cursor:pointer}.dnc-button:disabled,.dnc-icon-button:disabled{cursor:not-allowed;opacity:.45}.dnc-button--primary{background:var(--dsw-alias-state-business-primary);color:#fff;font-weight:600}.dnc-button--secondary{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary)}.dnc-icon-button{padding:4px 7px;background:transparent;color:var(--dsw-alias-state-error-primary);font-size:11px}.dnc-actions{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;padding:10px 12px;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1) 94%,transparent);box-shadow:var(--dsw-shadow-lv1);backdrop-filter:blur(10px)}.dnc-actions span{color:var(--dsw-alias-label-tertiary);font-size:11px}.dnc-banner{margin:0;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:9px 12px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);font-size:12px}.dnc-banner--error{border-color:color-mix(in srgb,var(--dsw-alias-state-error-primary) 35%,transparent);color:var(--dsw-alias-state-error-primary)}.dnc-banner--success{border-color:color-mix(in srgb,var(--dsw-alias-state-success-primary) 35%,transparent);color:var(--dsw-alias-state-success-primary)}
+.dnc-button,.dnc-icon-button{border:0;border-radius:8px;padding:8px 13px;font:inherit;font-size:12px;cursor:pointer}.dnc-button:disabled,.dnc-icon-button:disabled{cursor:not-allowed;opacity:.45}.dnc-button--primary{background:var(--dsw-alias-state-business-primary);color:#fff;font-weight:600}.dnc-button--secondary{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary)}.dnc-icon-button{padding:4px 7px;background:transparent;color:var(--dsw-alias-state-error-primary);font-size:11px}.dnc-actions{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:14px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;padding:10px 12px;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1) 94%,transparent);box-shadow:var(--dsw-shadow-lv1);backdrop-filter:blur(10px)}.dnc-actions span{color:var(--dsw-alias-label-tertiary);font-size:11px}.dnc-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:9px 12px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);font-size:12px}.dnc-banner-close{flex:none;width:22px;height:22px;border:0;border-radius:6px;padding:0;background:transparent;color:currentColor;font:inherit;font-size:18px;line-height:22px;cursor:pointer;opacity:.7}.dnc-banner-close:hover{background:color-mix(in srgb,currentColor 10%,transparent);opacity:1}.dnc-banner-close:focus-visible{outline:2px solid currentColor;outline-offset:1px}.dnc-banner--error{border-color:color-mix(in srgb,var(--dsw-alias-state-error-primary) 35%,transparent);color:var(--dsw-alias-state-error-primary)}.dnc-banner--success{border-color:color-mix(in srgb,var(--dsw-alias-state-success-primary) 35%,transparent);color:var(--dsw-alias-state-success-primary)}
 @media(max-width:760px){.dnc-general-grid,.dnc-webhooks{grid-template-columns:1fr}.dnc-grid--four,.dnc-check-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.dnc-rule{grid-template-columns:90px minmax(0,1fr)}.dnc-rule label,.dnc-rule button{justify-self:start}}
 @media(max-width:480px){.dnc-general-language{grid-template-columns:1fr}.dnc-general-language select{margin-top:4px}}
 `;
